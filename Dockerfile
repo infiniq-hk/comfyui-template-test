@@ -1,6 +1,6 @@
 # ComfyUI on RunPod with Civitai/HuggingFace support
-# Base image: PyTorch + CUDA 12.5 runtime (latest stable)
-FROM pytorch/pytorch:2.4.0-cuda12.5-cudnn8-runtime
+# Base image: PyTorch + CUDA 12.1 + cuDNN 9
+FROM pytorch/pytorch:2.4.0-cuda12.1-cudnn9-runtime
 
 ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONDONTWRITEBYTECODE=1 \
