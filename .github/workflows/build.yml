@@ -16,4 +16,4 @@ jobs:
         with:
           context: .
           push: true
-          tags: yourdockeruser/comfyui-runpod:latest
+          tags: 8int/comfyui-runpod:latest
