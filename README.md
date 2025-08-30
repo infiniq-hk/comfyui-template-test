@@ -40,6 +40,8 @@ Then open `http://localhost:8188`.
   - `HF_FILES_TO_DOWNLOAD`: comma-separated `repo:path` specs to fetch a single file
   - `CUSTOM_NODES`: comma-separated git URLs for ComfyUI custom nodes to clone
   - `DEFAULT_WORKFLOW_URL`: optional URL to a workflow JSON to pre-load into `/workspace/workflows/default.json`
+  - `ENABLE_JUPYTER`: set to "true" to start JupyterLab on port 8888
+  - `ENABLE_FILEBROWSER`: set to "true" to start FileBrowser on port 8090
 
 Models are stored in:
 

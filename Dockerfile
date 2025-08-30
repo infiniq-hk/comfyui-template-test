@@ -23,7 +23,14 @@ RUN pip install --upgrade pip && \
     requests tqdm pydantic typing-extensions \
     huggingface-hub==0.24.6 \
     hf-transfer \
-    civitai==0.1.5 || true
+    civitai==0.1.5 \
+    jupyterlab || true
+
+# Install FileBrowser
+RUN curl -L -o /tmp/fb.tar.gz https://github.com/filebrowser/filebrowser/releases/latest/download/linux-amd64-filebrowser.tar.gz && \
+    tar -xzf /tmp/fb.tar.gz -C /usr/local/bin filebrowser && \
+    chmod +x /usr/local/bin/filebrowser && \
+    rm /tmp/fb.tar.gz
 
 # Clone ComfyUI
 RUN git clone --depth=1 https://github.com/comfyanonymous/ComfyUI.git ${COMFYUI_DIR} && \

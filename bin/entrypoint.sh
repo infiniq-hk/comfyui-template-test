@@ -48,6 +48,17 @@ if [[ -n "${HF_REPOS_TO_DOWNLOAD:-}" || -n "${HF_FILES_TO_DOWNLOAD:-}" ]]; then
     "${HF_FILES_TO_DOWNLOAD:-}"
 fi
 
+# Start optional services
+if [[ "${ENABLE_JUPYTER:-false}" == "true" ]]; then
+  echo "Starting JupyterLab on port 8888..."
+  jupyter lab --no-browser --ip=0.0.0.0 --port=8888 --NotebookApp.token='' --notebook-dir="${WORKSPACE}" &
+fi
+
+if [[ "${ENABLE_FILEBROWSER:-false}" == "true" ]]; then
+  echo "Starting FileBrowser on port 8090..."
+  filebrowser -r "${WORKSPACE}" -a 0.0.0.0 -p 8090 &
+fi
+
 # Start ComfyUI
 cd "${COMFYUI_DIR}"
 
