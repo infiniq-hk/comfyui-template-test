@@ -30,10 +30,11 @@ if [[ -n "${CUSTOM_NODES:-}" ]]; then
   done
 fi
 
-# Downloads via helper scripts
+# Downloads via helper scripts (best-effort; never block startup)
 if [[ -n "${CHECKPOINT_IDS_TO_DOWNLOAD:-}" || -n "${LORAS_IDS_TO_DOWNLOAD:-}" || -n "${VAE_IDS_TO_DOWNLOAD:-}" || -n "${CONTROLNET_IDS_TO_DOWNLOAD:-}" || -n "${EMBEDDING_IDS_TO_DOWNLOAD:-}" || -n "${UPSCALER_IDS_TO_DOWNLOAD:-}" || \
       -n "${CHECKPOINT_VERSION_IDS_TO_DOWNLOAD:-}" || -n "${LORAS_VERSION_IDS_TO_DOWNLOAD:-}" || -n "${VAE_VERSION_IDS_TO_DOWNLOAD:-}" || -n "${CONTROLNET_VERSION_IDS_TO_DOWNLOAD:-}" || -n "${EMBEDDING_VERSION_IDS_TO_DOWNLOAD:-}" || -n "${UPSCALER_VERSION_IDS_TO_DOWNLOAD:-}" ]]; then
   CIVITAI_TOKEN_ENV="${civitai_token:-}"
+  set +e
   /opt/scripts/download_civitai.sh "${CIVITAI_TOKEN_ENV}" \
     "${CHECKPOINT_IDS_TO_DOWNLOAD:-}" \
     "${LORAS_IDS_TO_DOWNLOAD:-}" \
@@ -46,13 +47,16 @@ if [[ -n "${CHECKPOINT_IDS_TO_DOWNLOAD:-}" || -n "${LORAS_IDS_TO_DOWNLOAD:-}" ||
     "${VAE_VERSION_IDS_TO_DOWNLOAD:-}" \
     "${CONTROLNET_VERSION_IDS_TO_DOWNLOAD:-}" \
     "${EMBEDDING_VERSION_IDS_TO_DOWNLOAD:-}" \
-    "${UPSCALER_VERSION_IDS_TO_DOWNLOAD:-}"
+    "${UPSCALER_VERSION_IDS_TO_DOWNLOAD:-}" || echo "[warn] Civitai downloads encountered errors; continuing"
+  set -e
 fi
 
 if [[ -n "${HF_REPOS_TO_DOWNLOAD:-}" || -n "${HF_FILES_TO_DOWNLOAD:-}" ]]; then
+  set +e
   /opt/scripts/download_hf.sh "${HF_TOKEN:-}" \
     "${HF_REPOS_TO_DOWNLOAD:-}" \
-    "${HF_FILES_TO_DOWNLOAD:-}"
+    "${HF_FILES_TO_DOWNLOAD:-}" || echo "[warn] Hugging Face downloads encountered errors; continuing"
+  set -e
 fi
 
 # Start optional services
