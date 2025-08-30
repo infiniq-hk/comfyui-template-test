@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -uo pipefail
 
 # Usage: download_hf.sh <HF_TOKEN> <REPOS_CSV> <FILES_CSV>
 # - REPOS_CSV: comma-separated repo ids (e.g., "runwayml/stable-diffusion-v1-5,stabilityai/sd-vae-ft-mse")
@@ -14,22 +14,25 @@ mkdir -p "${MODELS_ROOT}"
 
 export HF_HOME="${HF_HOME:-/workspace/.cache/huggingface}"
 export HF_HUB_ENABLE_HF_TRANSFER=1
-if [[ -n "${HF_TOKEN}" ]]; then
+  if [[ -n "${HF_TOKEN}" ]]; then
   mkdir -p ~/.huggingface
-  echo "{"token":"${HF_TOKEN}"}" > ~/.huggingface/token
+  echo "{\"token\":\"${HF_TOKEN}\"}" > ~/.huggingface/token
 fi
 
 _snapshot() {
   local repo="$1"
   echo "Snapshotting repo ${repo}"
-  python - <<PY
-from huggingface_hub import snapshot_download
-import os
-repo_id = "${repo}"
-local_dir = os.path.join("${MODELS_ROOT}", repo_id.replace('/', '__'))
-os.makedirs(local_dir, exist_ok=True)
-snapshot_download(repo_id=repo_id, local_dir=local_dir, local_dir_use_symlinks=False, resume_download=True, allow_patterns=None)
-print(local_dir)
+  python - <<PY 2>/dev/null || echo "Failed to snapshot ${repo}"
+try:
+    from huggingface_hub import snapshot_download
+    import os
+    repo_id = "${repo}"
+    local_dir = os.path.join("${MODELS_ROOT}", repo_id.replace('/', '__'))
+    os.makedirs(local_dir, exist_ok=True)
+    snapshot_download(repo_id=repo_id, local_dir=local_dir, local_dir_use_symlinks=False, resume_download=True, allow_patterns=None)
+    print(local_dir)
+except Exception as e:
+    print(f"Error: {e}")
 PY
 }
 
@@ -38,15 +41,18 @@ _download_file() {
   IFS=':' read -r repo path <<< "${spec}"
   [[ -z "${repo}" || -z "${path}" ]] && return 0
   echo "Downloading ${repo}:${path}"
-  python - <<PY
-from huggingface_hub import hf_hub_download
-import os
-repo_id = "${repo}"
-filename = "${path}"
-local_dir = os.path.join("${MODELS_ROOT}", repo_id.replace('/', '__'))
-os.makedirs(local_dir, exist_ok=True)
-dst = hf_hub_download(repo_id=repo_id, filename=filename, local_dir=local_dir, local_dir_use_symlinks=False, resume_download=True)
-print(dst)
+  python - <<PY 2>/dev/null || echo "Failed to download ${repo}:${path}"
+try:
+    from huggingface_hub import hf_hub_download
+    import os
+    repo_id = "${repo}"
+    filename = "${path}"
+    local_dir = os.path.join("${MODELS_ROOT}", repo_id.replace('/', '__'))
+    os.makedirs(local_dir, exist_ok=True)
+    dst = hf_hub_download(repo_id=repo_id, filename=filename, local_dir=local_dir, local_dir_use_symlinks=False, resume_download=True)
+    print(dst)
+except Exception as e:
+    print(f"Error: {e}")
 PY
 }
 

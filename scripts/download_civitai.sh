@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -uo pipefail
 
 # Usage: download_civitai.sh <TOKEN> <CHECKPOINT_IDS> <LORA_IDS> <VAE_IDS> <CONTROLNET_IDS> <EMBEDDING_IDS> <UPSCALER_IDS> \
 #                                    <CHECKPOINT_VERSION_IDS> <LORA_VERSION_IDS> <VAE_VERSION_IDS> <CONTROLNET_VERSION_IDS> <EMBEDDING_VERSION_IDS> <UPSCALER_VERSION_IDS>
@@ -39,23 +39,26 @@ _download_by_model_id() {
     url="${url}?token=${TOKEN}"
   fi
   echo "Fetching ${url}"
-  json=$(curl -fsSL "${url}")
+  json=$(curl -fsSL "${url}" 2>/dev/null || echo "")
   # pick first primary file's downloadUrl
-  downloadUrl=$(echo "${json}" | python - <<'PY'
+  downloadUrl=$(echo "${json}" | python - <<'PY' 2>/dev/null || echo ""
 import sys, json
-data=json.load(sys.stdin)
-items=data.get('modelVersions',[])
-for v in items:
-  files=v.get('files',[])
-  for f in files:
-    if f.get('primary') and f.get('downloadUrl'):
-      print(f['downloadUrl'])
-      sys.exit(0)
-  if files:
-    u=files[0].get('downloadUrl')
-    if u:
-      print(u)
-      sys.exit(0)
+try:
+  data=json.load(sys.stdin)
+  items=data.get('modelVersions',[])
+  for v in items:
+    files=v.get('files',[])
+    for f in files:
+      if f.get('primary') and f.get('downloadUrl'):
+        print(f['downloadUrl'])
+        sys.exit(0)
+    if files:
+      u=files[0].get('downloadUrl')
+      if u:
+        print(u)
+        sys.exit(0)
+except:
+  pass
 print("")
 PY
 )
@@ -70,7 +73,7 @@ PY
   fi
   echo "Downloading model ${model_id} to ${subdir}"
   cd "${MODELS_ROOT}/${subdir}"
-  aria2c -x16 -s16 -k1M --continue=true "${downloadUrl}" || curl -fLo "model_${model_id}" "${downloadUrl}"
+  aria2c -x16 -s16 -k1M --continue=true "${downloadUrl}" 2>/dev/null || curl -fLo "model_${model_id}" "${downloadUrl}" 2>/dev/null || echo "Failed to download model ${model_id}"
 }
 
 _download_by_version_id() {
@@ -80,21 +83,24 @@ _download_by_version_id() {
     url="${url}?token=${TOKEN}"
   fi
   echo "Fetching ${url}"
-  json=$(curl -fsSL "${url}")
+  json=$(curl -fsSL "${url}" 2>/dev/null || echo "")
   # pick primary file's downloadUrl or fallback to first
-  downloadUrl=$(echo "${json}" | python - <<'PY'
+  downloadUrl=$(echo "${json}" | python - <<'PY' 2>/dev/null || echo ""
 import sys, json
-data=json.load(sys.stdin)
-files=data.get('files', [])
-for f in files:
-  if f.get('primary') and f.get('downloadUrl'):
-    print(f['downloadUrl'])
-    sys.exit(0)
-if files:
-  u=files[0].get('downloadUrl')
-  if u:
-    print(u)
-    sys.exit(0)
+try:
+  data=json.load(sys.stdin)
+  files=data.get('files', [])
+  for f in files:
+    if f.get('primary') and f.get('downloadUrl'):
+      print(f['downloadUrl'])
+      sys.exit(0)
+  if files:
+    u=files[0].get('downloadUrl')
+    if u:
+      print(u)
+      sys.exit(0)
+except:
+  pass
 print("")
 PY
 )
@@ -109,7 +115,7 @@ PY
   fi
   echo "Downloading version ${version_id} to ${subdir}"
   cd "${MODELS_ROOT}/${subdir}"
-  aria2c -x16 -s16 -k1M --continue=true "${downloadUrl}" || curl -fLo "model_version_${version_id}" "${downloadUrl}"
+  aria2c -x16 -s16 -k1M --continue=true "${downloadUrl}" 2>/dev/null || curl -fLo "model_version_${version_id}" "${downloadUrl}" 2>/dev/null || echo "Failed to download version ${version_id}"
 }
 
 IFS=',' read -ra ckpt_ids <<< "${CHECKPOINT_IDS}"

@@ -15,7 +15,7 @@ mkdir -p "${HF_HOME}" "${MODELS_DIR}"
 
 if [[ -n "${HF_TOKEN}" ]]; then
   mkdir -p ~/.huggingface
-  echo "{"token":"${HF_TOKEN}"}" > ~/.huggingface/token
+  echo "{\"token\":\"${HF_TOKEN}\"}" > ~/.huggingface/token
 fi
 
 # Optional: clone popular/custom nodes from env var CUSTOM_NODES (comma-separated repo URLs)
