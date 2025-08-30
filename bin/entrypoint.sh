@@ -75,6 +75,7 @@ if [[ -n "${DEFAULT_WORKFLOW_URL:-}" ]]; then
   curl -fsSL "${DEFAULT_WORKFLOW_URL}" -o "${WORKSPACE}/workflows/default.json" || true
 fi
 
-exec python main.py --listen 0.0.0.0 --port 8188 --output-directory "${WORKSPACE}/outputs" --input-directory "${WORKSPACE}/inputs"
+exec python main.py --listen "${LISTEN_HOST:-0.0.0.0}" --port "${COMFYUI_PORT:-8188}" \
+  --output-directory "${WORKSPACE}/outputs" --input-directory "${WORKSPACE}/inputs" ${COMFYUI_EXTRA_ARGS:-}
 
 
