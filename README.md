@@ -35,6 +35,12 @@ Then open `http://localhost:8188`.
   - `CONTROLNET_IDS_TO_DOWNLOAD`: comma-separated Civitai model IDs for ControlNet models
   - `EMBEDDING_IDS_TO_DOWNLOAD`: comma-separated Civitai model IDs for text embeddings
   - `UPSCALER_IDS_TO_DOWNLOAD`: comma-separated Civitai model IDs for upscalers
+  - `CHECKPOINT_VERSION_IDS_TO_DOWNLOAD`: comma-separated Civitai model VERSION IDs for checkpoints
+  - `LORAS_VERSION_IDS_TO_DOWNLOAD`: comma-separated VERSION IDs for LoRAs
+  - `VAE_VERSION_IDS_TO_DOWNLOAD`: comma-separated VERSION IDs for VAEs
+  - `CONTROLNET_VERSION_IDS_TO_DOWNLOAD`: comma-separated VERSION IDs for ControlNet models
+  - `EMBEDDING_VERSION_IDS_TO_DOWNLOAD`: comma-separated VERSION IDs for embeddings
+  - `UPSCALER_VERSION_IDS_TO_DOWNLOAD`: comma-separated VERSION IDs for upscalers
   - `HF_TOKEN`: optional token for private HF repos; see [Hugging Face docs](https://huggingface.co/docs)
   - `HF_REPOS_TO_DOWNLOAD`: comma-separated repo IDs to snapshot
   - `HF_FILES_TO_DOWNLOAD`: comma-separated `repo:path` specs to fetch a single file
