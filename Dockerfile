@@ -42,6 +42,13 @@ RUN mkdir -p ${WORKSPACE} ${MODELS_DIR} && \
     rm -rf ${COMFYUI_DIR}/models && \
     ln -s ${MODELS_DIR} ${COMFYUI_DIR}/models
 
+# Pre-install a few popular custom nodes
+RUN set -eux; \
+    cd ${COMFYUI_DIR}/custom_nodes && \
+    if [ ! -d ComfyUI-Manager ]; then git clone --depth=1 https://github.com/ltdrdata/ComfyUI-Manager.git; fi && \
+    if [ ! -d comfyui_controlnet_aux ]; then git clone --depth=1 https://github.com/Fannovel16/comfyui_controlnet_aux.git; fi && \
+    if [ ! -d ComfyUI_Noise ]; then git clone --depth=1 https://github.com/BlenderNeko/ComfyUI_Noise.git; fi
+
 # Add scripts
 COPY bin/entrypoint.sh /usr/local/bin/entrypoint.sh
 COPY scripts/ /opt/scripts/

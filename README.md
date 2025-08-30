@@ -59,4 +59,14 @@ The container symlinks `ComfyUI/models` → `/workspace/models` so everything pe
 - Civitai downloads use `downloadUrl` with `?token=` when provided per the official API. See [Civitai Public REST API](https://developer.civitai.com/docs/api/public-rest).
 - Hugging Face downloads use `huggingface_hub` snapshot/file APIs; see [Hugging Face Docs](https://huggingface.co/docs).
 
+### Preinstalled custom nodes
+
+- `ComfyUI-Manager`
+- `comfyui_controlnet_aux`
+- `ComfyUI_Noise`
+
+### Workflow templates
+
+- If `DEFAULT_WORKFLOW_URL` is set, it will download to `/workspace/workflows/default.json` on startup.
+
 
