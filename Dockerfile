@@ -31,7 +31,7 @@ RUN pip install --upgrade pip && \
     huggingface-hub==0.24.6 \
     hf-transfer \
     civitai==0.1.5 \
-    jupyterlab opencv-python || true
+    jupyterlab opencv-python-headless || true
 
 # Install FileBrowser
 RUN curl -L -o /tmp/fb.tar.gz https://github.com/filebrowser/filebrowser/releases/latest/download/linux-amd64-filebrowser.tar.gz && \
@@ -93,7 +93,9 @@ RUN set -eux; \
                 git clone --depth=1 "$repo" || true; \
             fi; \
             if [ -f "$repo_dir/requirements.txt" ]; then \
-                pip install --no-cache-dir -r "$repo_dir/requirements.txt" || true; \
+                # Filter out heavy GPU libs to prevent reinstalling torch/cuda on the runner
+                grep -viE '^(torch|torchvision|torchaudio|xformers|triton|onnx(runtime)?|tensorrt|cupy|nvidia-|cuda-)' "$repo_dir/requirements.txt" > /tmp/req.txt || true; \
+                if [ -s /tmp/req.txt ]; then pip install --no-cache-dir -r /tmp/req.txt || true; fi; \
             fi; \
             if [ -f "$repo_dir/install.py" ]; then \
                 python "$repo_dir/install.py" || true; \
