@@ -31,8 +31,13 @@ if [[ -n "${CUSTOM_NODES:-}" ]]; then
 fi
 
 # Downloads via helper scripts (best-effort; never block startup)
+echo "[INFO] Checking for Civitai downloads..."
+echo "[DEBUG] CHECKPOINT_VERSION_IDS_TO_DOWNLOAD='${CHECKPOINT_VERSION_IDS_TO_DOWNLOAD:-}'"
+echo "[DEBUG] civitai_token='${civitai_token:-}'"
+
 if [[ -n "${CHECKPOINT_IDS_TO_DOWNLOAD:-}" || -n "${LORAS_IDS_TO_DOWNLOAD:-}" || -n "${VAE_IDS_TO_DOWNLOAD:-}" || -n "${CONTROLNET_IDS_TO_DOWNLOAD:-}" || -n "${EMBEDDING_IDS_TO_DOWNLOAD:-}" || -n "${UPSCALER_IDS_TO_DOWNLOAD:-}" || \
       -n "${CHECKPOINT_VERSION_IDS_TO_DOWNLOAD:-}" || -n "${LORAS_VERSION_IDS_TO_DOWNLOAD:-}" || -n "${VAE_VERSION_IDS_TO_DOWNLOAD:-}" || -n "${CONTROLNET_VERSION_IDS_TO_DOWNLOAD:-}" || -n "${EMBEDDING_VERSION_IDS_TO_DOWNLOAD:-}" || -n "${UPSCALER_VERSION_IDS_TO_DOWNLOAD:-}" ]]; then
+  echo "[INFO] Starting Civitai downloads..."
   CIVITAI_TOKEN_ENV="${civitai_token:-}"
   set +e
   /opt/scripts/download_civitai.sh "${CIVITAI_TOKEN_ENV}" \
@@ -49,6 +54,8 @@ if [[ -n "${CHECKPOINT_IDS_TO_DOWNLOAD:-}" || -n "${LORAS_IDS_TO_DOWNLOAD:-}" ||
     "${EMBEDDING_VERSION_IDS_TO_DOWNLOAD:-}" \
     "${UPSCALER_VERSION_IDS_TO_DOWNLOAD:-}" || echo "[warn] Civitai downloads encountered errors; continuing"
   set -e
+else
+  echo "[INFO] No Civitai download IDs specified, skipping downloads"
 fi
 
 if [[ -n "${HF_REPOS_TO_DOWNLOAD:-}" || -n "${HF_FILES_TO_DOWNLOAD:-}" ]]; then
