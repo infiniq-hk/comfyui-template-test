@@ -62,7 +62,7 @@ fi
 # Start optional services
 if [[ "${ENABLE_JUPYTER:-false}" == "true" ]]; then
   echo "Starting JupyterLab on port 8888..."
-  jupyter lab --no-browser --ip=0.0.0.0 --port=8888 --ServerApp.token='' --ServerApp.password='' --notebook-dir="${WORKSPACE}" > /tmp/jupyter.log 2>&1 &
+  python -m jupyterlab --no-browser --ip=0.0.0.0 --port=8888 --ServerApp.token='' --ServerApp.password='' --notebook-dir="${WORKSPACE}" > /tmp/jupyter.log 2>&1 &
 fi
 
 if [[ "${ENABLE_FILEBROWSER:-false}" == "true" ]]; then
