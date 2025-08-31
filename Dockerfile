@@ -93,9 +93,7 @@ RUN set -eux; \
                 git clone --depth=1 "$repo" || true; \
             fi; \
             if [ -f "$repo_dir/requirements.txt" ]; then \
-                # Filter out heavy GPU libs to prevent reinstalling torch/cuda on the runner
-                grep -viE '^(torch|torchvision|torchaudio|xformers|triton|onnx(runtime)?|tensorrt|cupy|nvidia-|cuda-)' "$repo_dir/requirements.txt" > /tmp/req.txt || true; \
-                if [ -s /tmp/req.txt ]; then pip install --no-cache-dir -r /tmp/req.txt || true; fi; \
+                pip install --no-cache-dir -r "$repo_dir/requirements.txt" || true;
             fi; \
             if [ -f "$repo_dir/install.py" ]; then \
                 python "$repo_dir/install.py" || true; \
