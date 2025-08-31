@@ -31,7 +31,7 @@ RUN pip install --upgrade pip && \
     huggingface-hub==0.24.6 \
     hf-transfer \
     civitai==0.1.5 \
-    jupyterlab || true
+    jupyterlab opencv-python || true
 
 # Install FileBrowser
 RUN curl -L -o /tmp/fb.tar.gz https://github.com/filebrowser/filebrowser/releases/latest/download/linux-amd64-filebrowser.tar.gz && \
@@ -50,12 +50,56 @@ RUN mkdir -p ${WORKSPACE} ${MODELS_DIR} && \
     rm -rf ${COMFYUI_DIR}/models && \
     ln -s ${MODELS_DIR} ${COMFYUI_DIR}/models
 
-# Pre-install a few popular custom nodes
+# Pre-install a comprehensive set of popular custom nodes
 RUN set -eux; \
     cd ${COMFYUI_DIR}/custom_nodes && \
-    if [ ! -d ComfyUI-Manager ]; then git clone --depth=1 https://github.com/ltdrdata/ComfyUI-Manager.git; fi && \
-    if [ ! -d comfyui_controlnet_aux ]; then git clone --depth=1 https://github.com/Fannovel16/comfyui_controlnet_aux.git; fi && \
-    if [ ! -d ComfyUI_Noise ]; then git clone --depth=1 https://github.com/BlenderNeko/ComfyUI_Noise.git; fi
+    for repo in \
+        https://github.com/ltdrdata/ComfyUI-Manager.git \
+        https://github.com/ssitu/ComfyUI_UltimateSDUpscale.git \
+        https://github.com/kijai/ComfyUI-KJNodes.git \
+        https://github.com/rgthree/rgthree-comfy.git \
+        https://github.com/JPS-GER/ComfyUI_JPS-Nodes.git \
+        https://github.com/Suzie1/ComfyUI_Comfyroll_CustomNodes.git \
+        https://github.com/Jordach/comfy-plasma.git \
+        https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite.git \
+        https://github.com/bash-j/mikey_nodes.git \
+        https://github.com/ltdrdata/ComfyUI-Impact-Pack.git \
+        https://github.com/Fannovel16/comfyui_controlnet_aux.git \
+        https://github.com/yolain/ComfyUI-Easy-Use.git \
+        https://github.com/kijai/ComfyUI-Florence2.git \
+        https://github.com/ShmuelRonen/ComfyUI-LatentSyncWrapper.git \
+        https://github.com/WASasquatch/was-node-suite-comfyui.git \
+        https://github.com/theUpsider/ComfyUI-Logic.git \
+        https://github.com/cubiq/ComfyUI_essentials.git \
+        https://github.com/chrisgoringe/cg-image-picker.git \
+        https://github.com/chflame163/ComfyUI_LayerStyle.git \
+        https://github.com/chrisgoringe/cg-use-everywhere.git \
+        https://github.com/ClownsharkBatwing/RES4LYF.git \
+        https://github.com/welltop-cn/ComfyUI-TeaCache.git \
+        https://github.com/Fannovel16/ComfyUI-Frame-Interpolation.git \
+        https://github.com/Jonseed/ComfyUI-Detail-Daemon.git \
+        https://github.com/kijai/ComfyUI-WanVideoWrapper.git \
+        https://github.com/chflame163/ComfyUI_LayerStyle_Advance.git \
+        https://github.com/BadCafeCode/masquerade-nodes-comfyui.git \
+        https://github.com/1038lab/ComfyUI-RMBG.git \
+        https://github.com/M1kep/ComfyLiterals.git \
+        https://github.com/BlenderNeko/ComfyUI_Noise.git; \
+    do \
+        repo_dir=$(basename "$repo" .git); \
+        if [ ! -d "$repo_dir" ]; then \
+            if [ "$repo" = "https://github.com/ssitu/ComfyUI_UltimateSDUpscale.git" ]; then \
+                git clone --recursive --depth=1 "$repo" || true; \
+            else \
+                git clone --depth=1 "$repo" || true; \
+            fi; \
+            if [ -f "$repo_dir/requirements.txt" ]; then \
+                pip install --no-cache-dir -r "$repo_dir/requirements.txt" || true; \
+            fi; \
+            if [ -f "$repo_dir/install.py" ]; then \
+                python "$repo_dir/install.py" || true; \
+            fi; \
+        fi; \
+    done
 
 # Create an unprivileged user to avoid root-owned files on mounted volumes
 RUN useradd -m -u 1000 -s /bin/bash comfy && \
