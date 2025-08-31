@@ -1,0 +1,23 @@
+version: 2.1
+
+jobs:
+  build:
+    machine:
+      image: ubuntu-2204:current
+      resource_class: large           # more disk/CPU than GH runners
+      docker_layer_caching: true
+    steps:
+      - checkout
+      - run: |
+          echo "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
+          docker buildx create --use
+          docker buildx build \
+            --push \
+            --progress plain \
+            --cache-to=type=registry,ref=${DOCKERHUB_USERNAME}/comfyui-runpod:buildcache,mode=max \
+            --cache-from=type=registry,ref=${DOCKERHUB_USERNAME}/comfyui-runpod:buildcache \
+            -t ${DOCKERHUB_USERNAME}/comfyui-runpod:latest .
+workflows:
+  build-and-push:
+    jobs:
+      - build
