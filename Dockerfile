@@ -93,7 +93,7 @@ RUN set -eux; \
                 git clone --depth=1 "$repo" || true; \
             fi; \
             if [ -f "$repo_dir/requirements.txt" ]; then \
-                pip install --no-cache-dir -r "$repo_dir/requirements.txt" || true;
+                pip install --no-cache-dir -r "$repo_dir/requirements.txt" || true; \
             fi; \
             if [ -f "$repo_dir/install.py" ]; then \
                 python "$repo_dir/install.py" || true; \
