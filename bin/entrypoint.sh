@@ -6,8 +6,8 @@ set -euo pipefail
 : "${COMFYUI_DIR:=/opt/ComfyUI}"
 : "${MODELS_DIR:=/workspace/models}"
 
-# Tokens (optional)
-: "${civitai_token:=}"
+# Tokens (optional) - accept both uppercase and lowercase
+: "${civitai_token:=${CIVITAI_TOKEN:-}}"
 : "${HF_TOKEN:=}"
 
 export HF_HOME="${HF_HOME:-${WORKSPACE}/.cache/huggingface}"
@@ -62,12 +62,15 @@ fi
 # Start optional services
 if [[ "${ENABLE_JUPYTER:-false}" == "true" ]]; then
   echo "Starting JupyterLab on port 8888..."
-  jupyter lab --no-browser --ip=0.0.0.0 --port=8888 --NotebookApp.token='' --notebook-dir="${WORKSPACE}" &
+  jupyter lab --no-browser --ip=0.0.0.0 --port=8888 --ServerApp.token='' --ServerApp.password='' --notebook-dir="${WORKSPACE}" > /tmp/jupyter.log 2>&1 &
 fi
 
 if [[ "${ENABLE_FILEBROWSER:-false}" == "true" ]]; then
   echo "Starting FileBrowser on port 8090..."
-  filebrowser -r "${WORKSPACE}" -a 0.0.0.0 -p 8090 &
+  # Create noauth config for FileBrowser
+  mkdir -p ~/.filebrowser
+  echo '{"auth":{"method":"noauth"}}' > ~/.filebrowser/config.json
+  filebrowser -r "${WORKSPACE}" -a 0.0.0.0 -p 8090 -c ~/.filebrowser/config.json > /tmp/filebrowser.log 2>&1 &
 fi
 
 # Start ComfyUI

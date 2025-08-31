@@ -4,7 +4,7 @@ set -uo pipefail
 # Usage: download_civitai.sh <TOKEN> <CHECKPOINT_IDS> <LORA_IDS> <VAE_IDS> <CONTROLNET_IDS> <EMBEDDING_IDS> <UPSCALER_IDS> \
 #                                    <CHECKPOINT_VERSION_IDS> <LORA_VERSION_IDS> <VAE_VERSION_IDS> <CONTROLNET_VERSION_IDS> <EMBEDDING_VERSION_IDS> <UPSCALER_VERSION_IDS>
 
-TOKEN="${1:-}"
+TOKEN="${1:-${civitai_token:-${CIVITAI_TOKEN:-}}}"
 CHECKPOINT_IDS="${2:-}"
 LORA_IDS="${3:-}"
 VAE_IDS="${4:-}"
