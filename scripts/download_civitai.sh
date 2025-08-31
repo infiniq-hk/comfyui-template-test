@@ -84,23 +84,27 @@ _download_by_version_id() {
   fi
   echo "Fetching ${url}"
   json=$(curl -fsSL "${url}" 2>/dev/null || echo "")
+  echo "[DEBUG] API Response (first 500 chars): ${json:0:500}" >&2
   # pick primary file's downloadUrl or fallback to first
   downloadUrl=$(echo "${json}" | python - <<'PY' 2>/dev/null || echo ""
 import sys, json
 try:
   data=json.load(sys.stdin)
+  # First check if there's a direct downloadUrl at root level
+  if 'downloadUrl' in data:
+    print(data['downloadUrl'])
+    sys.exit(0)
+  # Otherwise check files array
   files=data.get('files', [])
   for f in files:
     if f.get('primary') and f.get('downloadUrl'):
       print(f['downloadUrl'])
       sys.exit(0)
-  if files:
-    u=files[0].get('downloadUrl')
-    if u:
-      print(u)
-      sys.exit(0)
-except:
-  pass
+  if files and files[0].get('downloadUrl'):
+    print(files[0]['downloadUrl'])
+    sys.exit(0)
+except Exception as e:
+  print(f"Error parsing JSON: {e}", file=sys.stderr)
 print("")
 PY
 )
@@ -115,7 +119,46 @@ PY
   fi
   echo "Downloading version ${version_id} to ${subdir}"
   cd "${MODELS_ROOT}/${subdir}"
-  aria2c -x16 -s16 -k1M --continue=true "${downloadUrl}" 2>/dev/null || curl -fLo "model_version_${version_id}" "${downloadUrl}" 2>/dev/null || echo "Failed to download version ${version_id}"
+  
+  # Extract filename from JSON or URL
+  filename=$(echo "${json}" | python - <<'PY' 2>/dev/null || echo ""
+import sys, json
+try:
+  data=json.load(sys.stdin)
+  # Try to get filename from files array
+  files=data.get('files', [])
+  for f in files:
+    if f.get('primary') and f.get('name'):
+      print(f['name'])
+      sys.exit(0)
+  if files and files[0].get('name'):
+    print(files[0]['name'])
+    sys.exit(0)
+  # Fallback to model name
+  if data.get('model', {}).get('name'):
+    print(f"{data['model']['name']}_v{data.get('id', '')}.safetensors")
+    sys.exit(0)
+except:
+  pass
+print("")
+PY
+)
+  if [[ -z "${filename}" ]]; then
+    # Fallback: extract from URL or use version ID
+    filename=$(basename "${downloadUrl}" | cut -d'?' -f1)
+    if [[ -z "${filename}" || "${filename}" == "models" ]]; then
+      filename="model_v${version_id}.safetensors"
+    fi
+  fi
+  echo "[INFO] Downloading to: ${MODELS_ROOT}/${subdir}/${filename}"
+  
+  if aria2c -x16 -s16 -k1M --continue=true -o "${filename}" "${downloadUrl}" 2>/dev/null; then
+    echo "[SUCCESS] Downloaded ${filename}"
+  elif curl -fLo "${filename}" "${downloadUrl}" 2>/dev/null; then
+    echo "[SUCCESS] Downloaded ${filename} (via curl)"
+  else
+    echo "[ERROR] Failed to download version ${version_id}"
+  fi
 }
 
 IFS=',' read -ra ckpt_ids <<< "${CHECKPOINT_IDS}"

@@ -40,6 +40,7 @@ if [[ -n "${CHECKPOINT_IDS_TO_DOWNLOAD:-}" || -n "${LORAS_IDS_TO_DOWNLOAD:-}" ||
   echo "[INFO] Starting Civitai downloads..."
   CIVITAI_TOKEN_ENV="${civitai_token:-}"
   set +e
+  echo "[DEBUG] Running: /opt/scripts/download_civitai.sh with token length: ${#CIVITAI_TOKEN_ENV}"
   /opt/scripts/download_civitai.sh "${CIVITAI_TOKEN_ENV}" \
     "${CHECKPOINT_IDS_TO_DOWNLOAD:-}" \
     "${LORAS_IDS_TO_DOWNLOAD:-}" \
