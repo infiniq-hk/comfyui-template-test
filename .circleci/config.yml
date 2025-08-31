@@ -4,7 +4,7 @@ jobs:
   build:
     machine:
       image: ubuntu-2204:current
-      resource_class: large
+      resource_class: medium
     steps:
       - checkout
 
@@ -20,7 +20,6 @@ jobs:
       - run:
           name: Enable buildx
           command: |
-            docker run --privileged --rm tonistiigi/binfmt --install all || true
             docker buildx create --name builder --use || docker buildx use builder
 
       - run:
