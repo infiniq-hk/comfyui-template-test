@@ -3,14 +3,21 @@
 
 echo "Starting JupyterLab..."
 
-# Ensure JupyterLab is installed
-if ! python -c "import jupyterlab" 2>/dev/null; then
+# Check if jupyter command exists instead of Python module
+if ! command -v jupyter &> /dev/null; then
     echo "Installing JupyterLab..."
     pip install jupyterlab
 fi
 
-# Start JupyterLab
+# Start JupyterLab in workspace
 cd /workspace
-jupyter lab --ip=0.0.0.0 --port=8888 --no-browser --allow-root --NotebookApp.token='' --NotebookApp.password='' &
 
-echo "JupyterLab started on port 8888"
+# Check if already running
+if pgrep -f "jupyter-lab" > /dev/null; then
+    echo "JupyterLab is already running"
+else
+    echo "Starting JupyterLab on port 8888..."
+    nohup jupyter lab --ip=0.0.0.0 --port=8888 --no-browser --allow-root > /workspace/jupyter.log 2>&1 &
+    sleep 2
+    echo "JupyterLab started on port 8888"
+fi
