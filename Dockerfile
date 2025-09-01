@@ -31,7 +31,8 @@ RUN pip install --upgrade pip && \
     huggingface-hub==0.24.6 \
     hf-transfer \
     civitai==0.1.5 \
-    jupyterlab opencv-python-headless || true
+    opencv-python-headless && \
+    pip install --no-cache-dir jupyterlab
 
 # Install FileBrowser
 RUN curl -L -o /tmp/fb.tar.gz https://github.com/filebrowser/filebrowser/releases/latest/download/linux-amd64-filebrowser.tar.gz && \

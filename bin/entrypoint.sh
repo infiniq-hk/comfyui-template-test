@@ -86,8 +86,36 @@ fi
 
 # Start optional services
 if [[ "${ENABLE_JUPYTER:-false}" == "true" ]]; then
-  echo "Starting JupyterLab on port 8888..."
-  python -m jupyterlab --no-browser --ip=0.0.0.0 --port=8888 --ServerApp.token='' --ServerApp.password='' --notebook-dir="${WORKSPACE}" > /tmp/jupyter.log 2>&1 &
+  echo "[INFO] Starting JupyterLab on port 8888..."
+  
+  # Check if jupyterlab is installed
+  if python -c "import jupyterlab" 2>/dev/null; then
+    echo "[INFO] JupyterLab is installed, starting..."
+    nohup python -m jupyterlab --no-browser --ip=0.0.0.0 --port=8888 \
+      --ServerApp.token='' --ServerApp.password='' \
+      --ServerApp.allow_origin='*' --ServerApp.disable_check_xsrf=True \
+      --notebook-dir="${WORKSPACE}" > /tmp/jupyter.log 2>&1 &
+    JUPYTER_PID=$!
+    echo "[INFO] JupyterLab started with PID: $JUPYTER_PID"
+    
+    # Give it a moment to start and check if it's running
+    sleep 3
+    if kill -0 $JUPYTER_PID 2>/dev/null; then
+      echo "[SUCCESS] JupyterLab is running on http://0.0.0.0:8888"
+      echo "[INFO] Check logs at: /tmp/jupyter.log"
+    else
+      echo "[ERROR] JupyterLab failed to start. Check /tmp/jupyter.log"
+      cat /tmp/jupyter.log
+    fi
+  else
+    echo "[ERROR] JupyterLab is not installed! Installing now..."
+    pip install jupyterlab
+    echo "[INFO] Retrying JupyterLab startup..."
+    nohup python -m jupyterlab --no-browser --ip=0.0.0.0 --port=8888 \
+      --ServerApp.token='' --ServerApp.password='' \
+      --ServerApp.allow_origin='*' --ServerApp.disable_check_xsrf=True \
+      --notebook-dir="${WORKSPACE}" > /tmp/jupyter.log 2>&1 &
+  fi
 fi
 
 if [[ "${ENABLE_FILEBROWSER:-false}" == "true" ]]; then
