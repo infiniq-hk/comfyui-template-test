@@ -86,35 +86,14 @@ fi
 
 # Start optional services
 if [[ "${ENABLE_JUPYTER:-false}" == "true" ]]; then
-  echo "[INFO] Starting JupyterLab on port 8888..."
-  
-  # Check if jupyterlab is installed
-  if python -c "import jupyterlab" 2>/dev/null; then
-    echo "[INFO] JupyterLab is installed, starting..."
-    nohup python -m jupyterlab --no-browser --ip=0.0.0.0 --port=8888 \
-      --ServerApp.token='' --ServerApp.password='' \
-      --ServerApp.allow_origin='*' --ServerApp.disable_check_xsrf=True \
-      --notebook-dir="${WORKSPACE}" > /tmp/jupyter.log 2>&1 &
-    JUPYTER_PID=$!
-    echo "[INFO] JupyterLab started with PID: $JUPYTER_PID"
-    
-    # Give it a moment to start and check if it's running
-    sleep 3
-    if kill -0 $JUPYTER_PID 2>/dev/null; then
-      echo "[SUCCESS] JupyterLab is running on http://0.0.0.0:8888"
-      echo "[INFO] Check logs at: /tmp/jupyter.log"
-    else
-      echo "[ERROR] JupyterLab failed to start. Check /tmp/jupyter.log"
-      cat /tmp/jupyter.log
-    fi
+  echo "Starting JupyterLab..."
+  # Simple approach like Hearmeman24
+  if [ ! -f "/workspace/jupyter_${RUNPOD_POD_ID}_started" ]; then
+    jupyter-lab --ip=0.0.0.0 --allow-root --no-browser --NotebookApp.token='' --NotebookApp.password='' --ServerApp.allow_origin='*' --ServerApp.allow_credentials=True --notebook-dir=/workspace &
+    touch "/workspace/jupyter_${RUNPOD_POD_ID}_started"
+    echo "JupyterLab started on port 8888"
   else
-    echo "[ERROR] JupyterLab is not installed! Installing now..."
-    pip install jupyterlab
-    echo "[INFO] Retrying JupyterLab startup..."
-    nohup python -m jupyterlab --no-browser --ip=0.0.0.0 --port=8888 \
-      --ServerApp.token='' --ServerApp.password='' \
-      --ServerApp.allow_origin='*' --ServerApp.disable_check_xsrf=True \
-      --notebook-dir="${WORKSPACE}" > /tmp/jupyter.log 2>&1 &
+    echo "JupyterLab already running"
   fi
 fi
 
