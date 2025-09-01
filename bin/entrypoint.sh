@@ -82,15 +82,9 @@ fi
 
 # Start optional services
 if [[ "${ENABLE_JUPYTER:-false}" == "true" ]]; then
-  echo "Starting JupyterLab..."
-  # Simple approach like Hearmeman24
-  if [ ! -f "/workspace/jupyter_${RUNPOD_POD_ID}_started" ]; then
-    jupyter-lab --ip=0.0.0.0 --allow-root --no-browser --NotebookApp.token='' --NotebookApp.password='' --ServerApp.allow_origin='*' --ServerApp.allow_credentials=True --notebook-dir=/workspace &
-    touch "/workspace/jupyter_${RUNPOD_POD_ID}_started"
-    echo "JupyterLab started on port 8888"
-  else
-    echo "JupyterLab already running"
-  fi
+  # Call the simple startup script
+  chmod +x /opt/scripts/start_jupyter_simple.sh
+  /opt/scripts/start_jupyter_simple.sh
 fi
 
 if [[ "${ENABLE_FILEBROWSER:-false}" == "true" ]]; then
