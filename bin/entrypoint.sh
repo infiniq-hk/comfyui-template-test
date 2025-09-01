@@ -35,46 +35,42 @@ echo "[INFO] Checking for Civitai downloads..."
 echo "[DEBUG] CHECKPOINT_VERSION_IDS_TO_DOWNLOAD='${CHECKPOINT_VERSION_IDS_TO_DOWNLOAD:-}'"
 echo "[DEBUG] civitai_token length: ${#civitai_token}"
 
-# Simple Python-based downloads like Hearmeman24
-echo "[INFO] Processing Civitai downloads..."
+# Download CivitAI downloader script like Hearmeman24
+echo "[INFO] Setting up CivitAI downloader..."
+chmod +x /opt/scripts/download_with_aria.py
 
-# Make download script executable
-chmod +x /opt/scripts/download_civitai_simple.py
+# Define model categories and their IDs
+declare -A MODEL_CATEGORIES=(
+    ["${MODELS_DIR}/checkpoints"]="${CHECKPOINT_VERSION_IDS_TO_DOWNLOAD:-}"
+    ["${MODELS_DIR}/loras"]="${LORAS_VERSION_IDS_TO_DOWNLOAD:-}"
+    ["${MODELS_DIR}/vae"]="${VAE_VERSION_IDS_TO_DOWNLOAD:-}"
+    ["${MODELS_DIR}/controlnet"]="${CONTROLNET_VERSION_IDS_TO_DOWNLOAD:-}"
+    ["${MODELS_DIR}/embeddings"]="${EMBEDDING_VERSION_IDS_TO_DOWNLOAD:-}"
+    ["${MODELS_DIR}/upscale_models"]="${UPSCALER_VERSION_IDS_TO_DOWNLOAD:-}"
+)
 
-# Process checkpoint downloads
-if [[ -n "${CHECKPOINT_VERSION_IDS_TO_DOWNLOAD:-}" ]]; then
-  echo "[INFO] Downloading checkpoints..."
-  IFS=',' read -ra IDS <<< "${CHECKPOINT_VERSION_IDS_TO_DOWNLOAD}"
-  for id in "${IDS[@]}"; do
-    [[ -z "$id" ]] && continue
-    echo "Downloading checkpoint $id..."
-    (cd "${MODELS_DIR}/checkpoints" && python3 /opt/scripts/download_civitai_simple.py -m "$id") &
-  done
-fi
+# Ensure directories exist and schedule downloads
+for TARGET_DIR in "${!MODEL_CATEGORIES[@]}"; do
+    mkdir -p "$TARGET_DIR"
+    MODEL_IDS_STRING="${MODEL_CATEGORIES[$TARGET_DIR]}"
+    
+    # Skip if empty
+    if [[ -z "$MODEL_IDS_STRING" ]]; then
+        continue
+    fi
+    
+    IFS=',' read -ra MODEL_IDS <<< "$MODEL_IDS_STRING"
+    
+    for MODEL_ID in "${MODEL_IDS[@]}"; do
+        MODEL_ID=$(echo "$MODEL_ID" | xargs)  # Trim whitespace
+        if [[ -n "$MODEL_ID" ]]; then
+            echo "🚀 Scheduling download: $MODEL_ID to $TARGET_DIR"
+            (python3 /opt/scripts/download_with_aria.py -m "$MODEL_ID" -o "$TARGET_DIR") &
+        fi
+    done
+done
 
-# Process LoRA downloads
-if [[ -n "${LORAS_VERSION_IDS_TO_DOWNLOAD:-}" ]]; then
-  echo "[INFO] Downloading LoRAs..."
-  IFS=',' read -ra IDS <<< "${LORAS_VERSION_IDS_TO_DOWNLOAD}"
-  for id in "${IDS[@]}"; do
-    [[ -z "$id" ]] && continue
-    echo "Downloading LoRA $id..."
-    (cd "${MODELS_DIR}/loras" && python3 /opt/scripts/download_civitai_simple.py -m "$id") &
-  done
-fi
-
-# Process VAE downloads
-if [[ -n "${VAE_VERSION_IDS_TO_DOWNLOAD:-}" ]]; then
-  echo "[INFO] Downloading VAEs..."
-  IFS=',' read -ra IDS <<< "${VAE_VERSION_IDS_TO_DOWNLOAD}"
-  for id in "${IDS[@]}"; do
-    [[ -z "$id" ]] && continue
-    echo "Downloading VAE $id..."
-    (cd "${MODELS_DIR}/vae" && python3 /opt/scripts/download_civitai_simple.py -m "$id") &
-  done
-fi
-
-echo "[INFO] All downloads scheduled in background"
+echo "[INFO] All Civitai downloads scheduled"
 
 if [[ -n "${HF_REPOS_TO_DOWNLOAD:-}" || -n "${HF_FILES_TO_DOWNLOAD:-}" ]]; then
   set +e
