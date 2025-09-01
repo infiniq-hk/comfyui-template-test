@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
-set -uo pipefail
+# Don't exit on errors - we want to try all downloads
+set +e
+
+echo "[$(date)] Download script started with args: $@"
 
 # Usage: download_civitai.sh <TOKEN> <CHECKPOINT_IDS> <LORA_IDS> <VAE_IDS> <CONTROLNET_IDS> <EMBEDDING_IDS> <UPSCALER_IDS> \
 #                                    <CHECKPOINT_VERSION_IDS> <LORA_VERSION_IDS> <VAE_VERSION_IDS> <CONTROLNET_VERSION_IDS> <EMBEDDING_VERSION_IDS> <UPSCALER_VERSION_IDS>
@@ -20,6 +23,13 @@ CONTROLNET_VERSION_IDS="${11:-}"
 EMBEDDING_VERSION_IDS="${12:-}"
 UPSCALER_VERSION_IDS="${13:-}"
 
+echo "[DEBUG] Token provided: $([ -n "${TOKEN}" ] && echo "YES (length: ${#TOKEN})" || echo "NO")"
+echo "[DEBUG] CHECKPOINT_VERSION_IDS: ${CHECKPOINT_VERSION_IDS}"
+
+if [[ -z "${TOKEN}" ]]; then
+  echo "[ERROR] No Civitai API token found. Models requiring authentication will fail to download."
+fi
+
 API="https://civitai.com/api/v1/models"
 API_VERSIONS="https://civitai.com/api/v1/model-versions"
 MODELS_ROOT="${MODELS_DIR:-/workspace/models}"
@@ -35,11 +45,14 @@ mkdir -p \
 _download_by_model_id() {
   local model_id="$1" subdir="$2"
   local url="${API}/${model_id}"
+  echo "Fetching model ${model_id}..."
+  
+  # Use Authorization header as recommended by Civitai
   if [[ -n "${TOKEN}" ]]; then
-    url="${url}?token=${TOKEN}"
+    json=$(curl -fsSL -H "Authorization: Bearer ${TOKEN}" "${url}" 2>/dev/null || echo "")
+  else
+    json=$(curl -fsSL "${url}" 2>/dev/null || echo "")
   fi
-  echo "Fetching ${url}"
-  json=$(curl -fsSL "${url}" 2>/dev/null || echo "")
   # pick first primary file's downloadUrl
   downloadUrl=$(echo "${json}" | python - <<'PY' 2>/dev/null || echo ""
 import sys, json
@@ -79,12 +92,34 @@ PY
 _download_by_version_id() {
   local version_id="$1" subdir="$2"
   local url="${API_VERSIONS}/${version_id}"
+  echo "Fetching version ${version_id}..."
+  
+  # Use Authorization header as recommended by Civitai
   if [[ -n "${TOKEN}" ]]; then
-    url="${url}?token=${TOKEN}"
+    echo "[DEBUG] Using token for API call"
+    response=$(curl -sSL -w "\n%{http_code}" -H "Authorization: Bearer ${TOKEN}" "${url}" 2>/dev/null || echo "")
+  else
+    echo "[DEBUG] No token provided for API call"
+    response=$(curl -sSL -w "\n%{http_code}" "${url}" 2>/dev/null || echo "")
   fi
-  echo "Fetching ${url}"
-  json=$(curl -fsSL "${url}" 2>/dev/null || echo "")
-  echo "[DEBUG] API Response (first 500 chars): ${json:0:500}" >&2
+  
+  # Extract HTTP status code and JSON
+  http_code=$(echo "$response" | tail -n 1)
+  json=$(echo "$response" | sed '$d')
+  
+  echo "[DEBUG] HTTP Status: ${http_code}"
+  
+  if [[ "${http_code}" != "200" ]]; then
+    echo "[ERROR] API returned status ${http_code} for version ${version_id}"
+    echo "[DEBUG] Response: ${json:0:500}"
+    return 0
+  fi
+  
+  if [[ -z "${json}" || "${json}" == "null" ]]; then
+    echo "[ERROR] Empty or null response for version ${version_id}"
+    return 0
+  fi
+  
   # pick primary file's downloadUrl or fallback to first
   downloadUrl=$(echo "${json}" | python - <<'PY' 2>/dev/null || echo ""
 import sys, json
@@ -152,12 +187,23 @@ PY
   fi
   echo "[INFO] Downloading to: ${MODELS_ROOT}/${subdir}/${filename}"
   
-  if aria2c -x16 -s16 -k1M --continue=true -o "${filename}" "${downloadUrl}" 2>/dev/null; then
-    echo "[SUCCESS] Downloaded ${filename}"
-  elif curl -fLo "${filename}" "${downloadUrl}" 2>/dev/null; then
-    echo "[SUCCESS] Downloaded ${filename} (via curl)"
+  # Download with proper headers
+  if [[ -n "${TOKEN}" ]]; then
+    if aria2c -x16 -s16 -k1M --continue=true --header="Authorization: Bearer ${TOKEN}" -o "${filename}" "${downloadUrl}" 2>/dev/null; then
+      echo "[SUCCESS] Downloaded ${filename}"
+    elif curl -fL -H "Authorization: Bearer ${TOKEN}" -o "${filename}" "${downloadUrl}" 2>/dev/null; then
+      echo "[SUCCESS] Downloaded ${filename} (via curl)"
+    else
+      echo "[ERROR] Failed to download version ${version_id}"
+    fi
   else
-    echo "[ERROR] Failed to download version ${version_id}"
+    if aria2c -x16 -s16 -k1M --continue=true -o "${filename}" "${downloadUrl}" 2>/dev/null; then
+      echo "[SUCCESS] Downloaded ${filename}"
+    elif curl -fLo "${filename}" "${downloadUrl}" 2>/dev/null; then
+      echo "[SUCCESS] Downloaded ${filename} (via curl)"
+    else
+      echo "[ERROR] Failed to download version ${version_id}"
+    fi
   fi
 }
 
@@ -234,6 +280,7 @@ for id in "${upscaler_ids[@]:-}"; do
   _download_by_model_id "${id}" "upscale_models"
 done
 
-echo "Civitai downloads done"
+echo "[$(date)] Civitai download script completed"
+echo "[INFO] Check /tmp/civitai_download.log for details"
 
 

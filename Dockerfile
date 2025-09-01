@@ -112,6 +112,7 @@ COPY --chown=comfy:comfy bin/entrypoint.sh /usr/local/bin/entrypoint.sh
 COPY --chown=comfy:comfy scripts/ /opt/scripts/
 RUN chmod +x /usr/local/bin/entrypoint.sh && \
     chmod +x /opt/scripts/*.sh && \
+    chmod +x /opt/scripts/*.py && \
     chown -R comfy:comfy /opt/scripts
 
 EXPOSE 8188 8888 8090
