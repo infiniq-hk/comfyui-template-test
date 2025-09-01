@@ -1,157 +1,154 @@
 #!/usr/bin/env python3
 """
-CivitAI model downloader with aria2 - based on Hearmeman24's approach
+CivitAI model downloader with aria2/curl.
+- Uses token ONLY for API metadata fetch
+- No Authorization header on CDN (pre-signed) file URLs
+- Accepts BOTH version IDs and model IDs (resolves latest version with files)
 """
-import requests
 import argparse
 import os
 import sys
 import subprocess
-import json
+import requests
+
+USER_AGENT = (
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) "
+    "Chrome/124 Safari/537.36"
+)
+REFERER = "https://civitai.com"
+
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Download models from CivitAI")
-    parser.add_argument("-m", "--model", type=str, required=True, 
-                      help="CivitAI model version ID to download")
-    parser.add_argument("-t", "--token", type=str, 
-                      help="CivitAI API token (if not set in environment)")
-    parser.add_argument("-o", "--output", type=str, default=".", 
-                      help="Output directory")
-    parser.add_argument("--filename", type=str, 
-                      help="Override filename")
+    parser.add_argument("-m", "--model", required=True, help="model ID or version ID")
+    parser.add_argument("-o", "--output", default=".", help="output directory")
+    parser.add_argument("-t", "--token", help="CivitAI token (optional; env CIVITAI_TOKEN/civitai_token also used)")
+    parser.add_argument("--filename", help="override filename")
     return parser.parse_args()
 
+
 def get_token(args):
-    """Get token from args or environment"""
-    token = args.token or os.getenv("civitai_token") or os.getenv("CIVITAI_TOKEN")
-    if not token:
-        print("❌ Error: No CivitAI token provided!")
-        print("   Set CIVITAI_TOKEN environment variable or use --token")
-        sys.exit(1)
-    return token
+    """Get token from args or environment (optional)."""
+    return args.token or os.getenv("CIVITAI_TOKEN") or os.getenv("civitai_token")
 
-def fetch_model_info(model_id, token):
-    """Fetch model metadata from CivitAI API"""
-    url = f"https://civitai.com/api/v1/model-versions/{model_id}"
-    headers = {"Authorization": f"Bearer {token}"}
-    
-    print(f"🔍 Fetching metadata for model version {model_id}...")
-    
-    try:
-        response = requests.get(url, headers=headers, timeout=30)
-        response.raise_for_status()
-        return response.json()
-    except requests.exceptions.RequestException as e:
-        print(f"❌ API request failed: {e}")
-        sys.exit(1)
 
-def get_download_info(data, model_id, custom_filename=None):
-    """Extract download URL and filename from API response"""
-    # Get download URL
-    download_url = data.get('downloadUrl')
-    if not download_url:
-        print("❌ No downloadUrl found in API response")
-        sys.exit(1)
-    
-    # Determine filename
+def _api_get(url, token):
+    headers = {"User-Agent": USER_AGENT}
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    r = requests.get(url, headers=headers, timeout=30)
+    if r.status_code == 404:
+        return None
+    r.raise_for_status()
+    return r.json()
+
+
+def resolve_version(model_or_version_id, token):
+    """Resolve input as version first; if not found try model -> pick first version with files."""
+    ver = _api_get(f"https://civitai.com/api/v1/model-versions/{model_or_version_id}", token)
+    if ver:
+        return ver
+
+    model = _api_get(f"https://civitai.com/api/v1/models/{model_or_version_id}", token)
+    if not model:
+        sys.exit(f"❌ ID {model_or_version_id} not found as version or model")
+
+    versions = model.get("modelVersions") or []
+    chosen = None
+    for v in versions:
+        if v.get("files"):
+            chosen = v
+            break
+    if not chosen and versions:
+        chosen = versions[0]
+    if not chosen:
+        sys.exit(f"❌ Model {model_or_version_id} has no versions with files")
+
+    chosen["model"] = {"name": model.get("name", "model")}
+    return chosen
+
+
+def get_download_info(ver, fallback_id, custom_filename=None):
+    # URL
+    url = ver.get("downloadUrl")
+    if not url:
+        files = ver.get("files") or []
+        primary = None
+        for f in files:
+            if f.get("primary") and f.get("downloadUrl"):
+                primary = f
+                break
+        if not primary and files:
+            primary = files[0]
+        url = primary.get("downloadUrl") if primary else None
+    if not url:
+        sys.exit("❌ No downloadUrl in version")
+
+    # Filename
     if custom_filename:
-        filename = custom_filename
+        name = custom_filename
     else:
-        filename = None
-        # Try to get from files array
-        if 'files' in data and data['files']:
-            filename = data['files'][0].get('name')
-        
-        # Fallback to model name
-        if not filename and 'model' in data:
-            model_name = data['model'].get('name', 'model').replace(' ', '_')
-            filename = f"{model_name}_v{model_id}.safetensors"
-        
-        # Final fallback
-        if not filename:
-            filename = f"model_v{model_id}.safetensors"
-    
-    return download_url, filename
+        name = None
+        files = ver.get("files") or []
+        if files:
+            name = files[0].get("name")
+        if not name and ver.get("model"):
+            model_name = ver["model"].get("name", "model").replace(" ", "_")
+            name = f"{model_name}_v{ver.get('id', fallback_id)}.safetensors"
+        if not name:
+            name = f"model_v{fallback_id}.safetensors"
+    return url, name
 
-def download_with_aria2(url, filename, token, output_dir):
-    """Download file using aria2c with resume support"""
+
+def download_with_aria2(url, output_dir, filename):
     os.makedirs(output_dir, exist_ok=True)
-    filepath = os.path.join(output_dir, filename)
-    
-    # Check if file already exists
-    if os.path.exists(filepath):
-        size_mb = os.path.getsize(filepath) / (1024 * 1024)
-        if size_mb > 10:  # If larger than 10MB, assume it's complete
-            print(f"✅ File already exists: {filename} ({size_mb:.1f}MB)")
-            return True
-        else:
-            print(f"🗑️ Removing incomplete file: {filename} ({size_mb:.1f}MB)")
-            os.remove(filepath)
-    
-    print(f"📥 Downloading: {filename}")
-    print(f"📁 Output directory: {output_dir}")
-    
-    # Build aria2c command
+    dst = os.path.join(output_dir, filename)
+
+    if os.path.exists(dst) and os.path.getsize(dst) > 2 * 1024 * 1024:
+        print(f"✔ exists: {filename}")
+        return True
+
     cmd = [
         "aria2c",
-        "-x", "16",              # 16 connections
-        "-s", "16",              # 16 splits
-        "-k", "1M",              # 1MB chunks
-        "--continue=true",       # Resume downloads
-        "--dir", output_dir,     # Output directory
-        "-o", filename,          # Output filename
-        "--console-log-level=warn",  # Less verbose
-        "--summary-interval=5",      # Progress every 5 seconds
-        "--header", f"Authorization: Bearer {token}",
-        url
+        "-x", "8", "-s", "8", "-k", "1M",
+        "--continue=true",
+        "--dir", output_dir,
+        "-o", filename,
+        "--console-log-level=warn",
+        "--summary-interval=5",
+        "--header", f"User-Agent: {USER_AGENT}",
+        "--header", f"Referer: {REFERER}",
+        url,
     ]
-    
-    try:
-        # Run aria2c
-        result = subprocess.run(cmd)
-        
-        if result.returncode == 0:
-            print(f"✅ Successfully downloaded: {filename}")
-            return True
-        else:
-            print(f"❌ Download failed with aria2c (exit code: {result.returncode})")
-            return False
-            
-    except FileNotFoundError:
-        print("⚠️ aria2c not found. Please install aria2.")
-        print("   Ubuntu/Debian: sudo apt-get install aria2")
-        print("   macOS: brew install aria2")
-        return False
+    return subprocess.run(cmd).returncode == 0
+
+
+def download_with_curl(url, output_dir, filename):
+    os.makedirs(output_dir, exist_ok=True)
+    dst = os.path.join(output_dir, filename)
+    cmd = [
+        "curl", "-L", "-#", "-C", "-",
+        "-H", f"User-Agent: {USER_AGENT}",
+        "-H", f"Referer: {REFERER}",
+        "-o", dst,
+        url,
+    ]
+    return subprocess.run(cmd).returncode == 0
+
 
 def main():
     args = parse_args()
     token = get_token(args)
-    
-    # Fetch model info
-    data = fetch_model_info(args.model, token)
-    
-    # Get download details
-    download_url, filename = get_download_info(data, args.model, args.filename)
-    
-    # Download the file
-    success = download_with_aria2(download_url, filename, token, args.output)
-    
-    if not success:
-        print("\n💡 Falling back to curl...")
-        # Fallback to curl
-        filepath = os.path.join(args.output, filename)
-        cmd = [
-            "curl", "-L", "-#",
-            "-H", f"Authorization: Bearer {token}",
-            "-o", filepath,
-            download_url
-        ]
-        result = subprocess.run(cmd)
-        if result.returncode == 0:
-            print(f"✅ Successfully downloaded with curl: {filename}")
-        else:
-            print(f"❌ Download failed")
-            sys.exit(1)
+
+    ver = resolve_version(args.model, token)
+    url, filename = get_download_info(ver, args.model, args.filename)
+
+    print(f"↓ {filename} → {args.output}")
+    if download_with_aria2(url, args.output, filename) or download_with_curl(url, args.output, filename):
+        print(f"✅ downloaded: {filename}")
+    else:
+        sys.exit("❌ download failed")
+
 
 if __name__ == "__main__":
     main()

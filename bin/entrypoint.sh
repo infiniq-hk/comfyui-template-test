@@ -39,28 +39,36 @@ echo "[DEBUG] civitai_token length: ${#civitai_token}"
 echo "[INFO] Setting up CivitAI downloader..."
 chmod +x /opt/scripts/download_with_aria.py
 
+# Merge VERSION_* and legacy MODEL_* env vars so both are supported
+_ckpt_ids="${CHECKPOINT_VERSION_IDS_TO_DOWNLOAD:-}${CHECKPOINT_VERSION_IDS_TO_DOWNLOAD:+,}${CHECKPOINT_IDS_TO_DOWNLOAD:-}"
+_lora_ids="${LORAS_VERSION_IDS_TO_DOWNLOAD:-}${LORAS_VERSION_IDS_TO_DOWNLOAD:+,}${LORAS_IDS_TO_DOWNLOAD:-}"
+_vae_ids="${VAE_VERSION_IDS_TO_DOWNLOAD:-}${VAE_VERSION_IDS_TO_DOWNLOAD:+,}${VAE_IDS_TO_DOWNLOAD:-}"
+_ctrl_ids="${CONTROLNET_VERSION_IDS_TO_DOWNLOAD:-}${CONTROLNET_VERSION_IDS_TO_DOWNLOAD:+,}${CONTROLNET_IDS_TO_DOWNLOAD:-}"
+_emb_ids="${EMBEDDING_VERSION_IDS_TO_DOWNLOAD:-}${EMBEDDING_VERSION_IDS_TO_DOWNLOAD:+,}${EMBEDDING_IDS_TO_DOWNLOAD:-}"
+_up_ids="${UPSCALER_VERSION_IDS_TO_DOWNLOAD:-}${UPSCALER_VERSION_IDS_TO_DOWNLOAD:+,}${UPSCALER_IDS_TO_DOWNLOAD:-}"
+
 # Define model categories and their IDs
 declare -A MODEL_CATEGORIES=(
-    ["${MODELS_DIR}/checkpoints"]="${CHECKPOINT_VERSION_IDS_TO_DOWNLOAD:-}"
-    ["${MODELS_DIR}/loras"]="${LORAS_VERSION_IDS_TO_DOWNLOAD:-}"
-    ["${MODELS_DIR}/vae"]="${VAE_VERSION_IDS_TO_DOWNLOAD:-}"
-    ["${MODELS_DIR}/controlnet"]="${CONTROLNET_VERSION_IDS_TO_DOWNLOAD:-}"
-    ["${MODELS_DIR}/embeddings"]="${EMBEDDING_VERSION_IDS_TO_DOWNLOAD:-}"
-    ["${MODELS_DIR}/upscale_models"]="${UPSCALER_VERSION_IDS_TO_DOWNLOAD:-}"
+    ["${MODELS_DIR}/checkpoints"]="${_ckpt_ids}"
+    ["${MODELS_DIR}/loras"]="${_lora_ids}"
+    ["${MODELS_DIR}/vae"]="${_vae_ids}"
+    ["${MODELS_DIR}/controlnet"]="${_ctrl_ids}"
+    ["${MODELS_DIR}/embeddings"]="${_emb_ids}"
+    ["${MODELS_DIR}/upscale_models"]="${_up_ids}"
 )
 
 # Ensure directories exist and schedule downloads
 for TARGET_DIR in "${!MODEL_CATEGORIES[@]}"; do
     mkdir -p "$TARGET_DIR"
     MODEL_IDS_STRING="${MODEL_CATEGORIES[$TARGET_DIR]}"
-    
+
     # Skip if empty
     if [[ -z "$MODEL_IDS_STRING" ]]; then
         continue
     fi
-    
+
     IFS=',' read -ra MODEL_IDS <<< "$MODEL_IDS_STRING"
-    
+
     for MODEL_ID in "${MODEL_IDS[@]}"; do
         MODEL_ID=$(echo "$MODEL_ID" | xargs)  # Trim whitespace
         if [[ -n "$MODEL_ID" ]]; then
