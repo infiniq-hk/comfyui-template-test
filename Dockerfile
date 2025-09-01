@@ -30,9 +30,8 @@ RUN pip install --upgrade pip && \
     requests tqdm pydantic typing-extensions \
     huggingface-hub==0.24.6 \
     hf-transfer \
-    civitai==0.1.5 \
-    opencv-python-headless && \
-    pip install --no-cache-dir jupyterlab
+    opencv-python-headless \
+    jupyterlab
 
 # Install FileBrowser
 RUN curl -L -o /tmp/fb.tar.gz https://github.com/filebrowser/filebrowser/releases/latest/download/linux-amd64-filebrowser.tar.gz && \
