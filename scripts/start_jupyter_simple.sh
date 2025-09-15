@@ -17,7 +17,7 @@ if pgrep -f "jupyter-lab" > /dev/null; then
     echo "JupyterLab is already running"
 else
     echo "Starting JupyterLab on port 8888..."
-    nohup jupyter lab --ip=0.0.0.0 --port=8888 --no-browser --allow-root > /workspace/jupyter.log 2>&1 &
+    nohup jupyter lab --ip=0.0.0.0 --port=8888 --no-browser --allow-root --NotebookApp.token='' --NotebookApp.password='' --ServerApp.allow_origin='*' --ServerApp.allow_credentials=True > /workspace/jupyter.log 2>&1 &
     sleep 2
     echo "JupyterLab started on port 8888"
 fi
