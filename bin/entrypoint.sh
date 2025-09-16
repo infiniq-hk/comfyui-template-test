@@ -10,8 +10,13 @@ set -eo pipefail
 : "${civitai_token:=${CIVITAI_TOKEN:-}}"
 : "${HF_TOKEN:=}"
 
+# Service control
+: "${ENABLE_JUPYTER:=true}"
+: "${ENABLE_FILEBROWSER:=false}"
+: "${ENABLE_API:=true}"
+
 export HF_HOME="${HF_HOME:-${WORKSPACE}/.cache/huggingface}"
-mkdir -p "${HF_HOME}" "${MODELS_DIR}"
+mkdir -p "${HF_HOME}" "${MODELS_DIR}" "${WORKSPACE}/inputs" "${WORKSPACE}/outputs"
 
 if [[ -n "${HF_TOKEN}" ]]; then
   mkdir -p ~/.huggingface
@@ -32,16 +37,12 @@ fi
 
 # Downloads via helper scripts (best-effort; never block startup)
 echo "[INFO] Checking for Civitai downloads..."
-echo "[DEBUG] CHECKPOINT_VERSION_IDS_TO_DOWNLOAD='${CHECKPOINT_VERSION_IDS_TO_DOWNLOAD:-}'"
+echo "[DEBUG] CIVITAI_VERSION_IDS_TO_DOWNLOAD='${CIVITAI_VERSION_IDS_TO_DOWNLOAD:-}'"
 echo "[DEBUG] civitai_token length: ${#civitai_token}"
 
-# Download CivitAI downloader script like Hearmeman24
-echo "[INFO] Setting up CivitAI downloader..."
-chmod +x /opt/scripts/download_with_aria.py
-
-# Merge VERSION_* and legacy MODEL_* env vars so both are supported
-_ckpt_ids="${CHECKPOINT_VERSION_IDS_TO_DOWNLOAD:-}${CHECKPOINT_VERSION_IDS_TO_DOWNLOAD:+,}${CHECKPOINT_IDS_TO_DOWNLOAD:-}"
-_lora_ids="${LORAS_VERSION_IDS_TO_DOWNLOAD:-}${LORAS_VERSION_IDS_TO_DOWNLOAD:+,}${LORAS_IDS_TO_DOWNLOAD:-}"
+# Merge VERSION_* env vars for backward compatibility
+_ckpt_ids="${CIVITAI_VERSION_IDS_TO_DOWNLOAD:-}${CIVITAI_VERSION_IDS_TO_DOWNLOAD:+,}${CHECKPOINT_VERSION_IDS_TO_DOWNLOAD:-}"
+_lora_ids="${LORA_VERSION_IDS_TO_DOWNLOAD:-}${LORA_VERSION_IDS_TO_DOWNLOAD:+,}${LORAS_VERSION_IDS_TO_DOWNLOAD:-}"
 _vae_ids="${VAE_VERSION_IDS_TO_DOWNLOAD:-}${VAE_VERSION_IDS_TO_DOWNLOAD:+,}${VAE_IDS_TO_DOWNLOAD:-}"
 _ctrl_ids="${CONTROLNET_VERSION_IDS_TO_DOWNLOAD:-}${CONTROLNET_VERSION_IDS_TO_DOWNLOAD:+,}${CONTROLNET_IDS_TO_DOWNLOAD:-}"
 _emb_ids="${EMBEDDING_VERSION_IDS_TO_DOWNLOAD:-}${EMBEDDING_VERSION_IDS_TO_DOWNLOAD:+,}${EMBEDDING_IDS_TO_DOWNLOAD:-}"
@@ -73,13 +74,14 @@ for TARGET_DIR in "${!MODEL_CATEGORIES[@]}"; do
         MODEL_ID=$(echo "$MODEL_ID" | xargs)  # Trim whitespace
         if [[ -n "$MODEL_ID" ]]; then
             echo "🚀 Scheduling download: $MODEL_ID to $TARGET_DIR"
-            (python3 /opt/scripts/download_with_aria.py -m "$MODEL_ID" -o "$TARGET_DIR") &
+            (python3 /opt/scripts/download_with_aria.py -m "$MODEL_ID" -t "${civitai_token}" -o "$TARGET_DIR") &
         fi
     done
 done
 
 echo "[INFO] All Civitai downloads scheduled"
 
+# HuggingFace downloads
 if [[ -n "${HF_REPOS_TO_DOWNLOAD:-}" || -n "${HF_FILES_TO_DOWNLOAD:-}" ]]; then
   set +e
   /opt/scripts/download_hf.sh "${HF_TOKEN:-}" \
@@ -90,9 +92,11 @@ fi
 
 # Start optional services
 if [[ "${ENABLE_JUPYTER:-false}" == "true" ]]; then
-  # Call the simple startup script
-  chmod +x /opt/scripts/start_jupyter_simple.sh
-  /opt/scripts/start_jupyter_simple.sh
+  echo "Starting JupyterLab on port 8888..."
+  nohup jupyter lab --ip=0.0.0.0 --port=8888 --no-browser --allow-root \
+    --NotebookApp.token='' --NotebookApp.password='' \
+    --ServerApp.allow_origin='*' --ServerApp.allow_credentials=True \
+    --notebook-dir="${WORKSPACE}" > /workspace/jupyter.log 2>&1 &
 fi
 
 if [[ "${ENABLE_FILEBROWSER:-false}" == "true" ]]; then
@@ -100,15 +104,12 @@ if [[ "${ENABLE_FILEBROWSER:-false}" == "true" ]]; then
   # Create noauth config for FileBrowser
   mkdir -p ~/.filebrowser
   echo '{"auth":{"method":"noauth"}}' > ~/.filebrowser/config.json
-  filebrowser -r "${WORKSPACE}" -a 0.0.0.0 -p 8090 -c ~/.filebrowser/config.json > /tmp/filebrowser.log 2>&1 &
+  nohup filebrowser -r "${WORKSPACE}" -a 0.0.0.0 -p 8090 -c ~/.filebrowser/config.json > /tmp/filebrowser.log 2>&1 &
 fi
 
-# Wait a bit for downloads to start (optional)
-echo "[INFO] Waiting for downloads to initialize..."
-sleep 5
-
-# Start ComfyUI
+# Start ComfyUI in background
 cd "${COMFYUI_DIR}"
+echo "Starting ComfyUI on port ${COMFYUI_PORT:-8188}..."
 
 # Optionally fetch a default workflow JSON if provided
 if [[ -n "${DEFAULT_WORKFLOW_URL:-}" ]]; then
@@ -116,13 +117,27 @@ if [[ -n "${DEFAULT_WORKFLOW_URL:-}" ]]; then
   curl -fsSL "${DEFAULT_WORKFLOW_URL}" -o "${WORKSPACE}/workflows/default.json" || true
 fi
 
-# Log download status
-echo "[INFO] Download status:"
-if [ -f /tmp/civitai_download.log ]; then
-  tail -20 /tmp/civitai_download.log
+nohup python main.py --listen "${LISTEN_HOST:-0.0.0.0}" --port "${COMFYUI_PORT:-8188}" \
+  --output-directory "${WORKSPACE}/outputs" --input-directory "${WORKSPACE}/inputs" ${COMFYUI_EXTRA_ARGS:-} \
+  > /workspace/comfyui.log 2>&1 &
+
+# Wait for ComfyUI to start
+echo "[INFO] Waiting for ComfyUI to initialize..."
+for i in {1..30}; do
+  if curl -sf "http://127.0.0.1:${COMFYUI_PORT:-8188}/" >/dev/null 2>&1; then
+    echo "[INFO] ComfyUI is ready"
+    break
+  fi
+  sleep 2
+done
+
+# Start FastAPI serverless endpoint if enabled
+if [[ "${ENABLE_API:-false}" == "true" ]]; then
+  echo "Starting FastAPI serverless endpoint on port ${API_PORT:-8000}..."
+  cd /opt/serverless
+  exec uvicorn api:app --host 0.0.0.0 --port "${API_PORT:-8000}" --log-level info
+else
+  echo "[INFO] API disabled. ComfyUI running in background."
+  # Keep container alive
+  tail -f /workspace/comfyui.log
 fi
-
-exec python main.py --listen "${LISTEN_HOST:-0.0.0.0}" --port "${COMFYUI_PORT:-8188}" \
-  --output-directory "${WORKSPACE}/outputs" --input-directory "${WORKSPACE}/inputs" ${COMFYUI_EXTRA_ARGS:-}
-
-

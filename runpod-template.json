@@ -1,0 +1,78 @@
+{
+  "name": "ComfyUI Serverless API",
+  "description": "Production-ready ComfyUI with FastAPI endpoint, Jupyter, and reliable model downloads",
+  "dockerArgs": "",
+  "containerDiskInGb": 50,
+  "volumeInGb": 100,
+  "volumeMountPath": "/workspace",
+  "ports": "8188/http,8888/http,8090/http,8000/http",
+  "env": [
+    {
+      "key": "CIVITAI_TOKEN",
+      "value": "",
+      "description": "Civitai API token for downloading NSFW/private models"
+    },
+    {
+      "key": "HF_TOKEN", 
+      "value": "",
+      "description": "Hugging Face token for private repos"
+    },
+    {
+      "key": "CIVITAI_VERSION_IDS_TO_DOWNLOAD",
+      "value": "2117129,1920523,923681",
+      "description": "Comma-separated Civitai version IDs to download (checkpoints)"
+    },
+    {
+      "key": "LORA_VERSION_IDS_TO_DOWNLOAD",
+      "value": "",
+      "description": "Comma-separated Civitai version IDs for LoRAs"
+    },
+    {
+      "key": "HF_REPOS_TO_DOWNLOAD",
+      "value": "",
+      "description": "Comma-separated HF repos to download (e.g. stabilityai/stable-diffusion-xl-base-1.0)"
+    },
+    {
+      "key": "ENABLE_JUPYTER",
+      "value": "true",
+      "description": "Enable JupyterLab on port 8888 (no authentication)"
+    },
+    {
+      "key": "ENABLE_FILEBROWSER",
+      "value": "false", 
+      "description": "Enable FileBrowser on port 8090"
+    },
+    {
+      "key": "ENABLE_API",
+      "value": "true",
+      "description": "Enable FastAPI serverless endpoint on port 8000"
+    },
+    {
+      "key": "COMFYUI_PORT",
+      "value": "8188",
+      "description": "ComfyUI web interface port"
+    },
+    {
+      "key": "API_PORT",
+      "value": "8000", 
+      "description": "FastAPI endpoint port"
+    },
+    {
+      "key": "COMFY_TIMEOUT",
+      "value": "600",
+      "description": "Timeout for ComfyUI jobs in seconds"
+    },
+    {
+      "key": "DEFAULT_WORKFLOW_URL",
+      "value": "",
+      "description": "URL to download default workflow JSON"
+    },
+    {
+      "key": "CUSTOM_NODES",
+      "value": "",
+      "description": "Comma-separated custom node repo URLs to install"
+    }
+  ],
+  "startScript": "",
+  "readme": "# ComfyUI Serverless API Template\n\n## Features\n- **ComfyUI**: Latest version with essential custom nodes\n- **FastAPI**: RESTful API endpoint at `/generate`\n- **JupyterLab**: Code development environment (port 8888)\n- **FileBrowser**: File management interface (port 8090)\n- **Reliable Downloads**: Automatic model downloads from Civitai and HuggingFace\n- **Production Ready**: Health checks, error handling, CORS enabled\n\n## Ports\n- **8188**: ComfyUI web interface\n- **8888**: JupyterLab (no authentication)\n- **8090**: FileBrowser (optional)\n- **8000**: FastAPI serverless endpoint\n\n## API Usage\n\n### Generate Image\n```bash\ncurl -X POST \"https://your-pod-8000.proxy.runpod.net/generate\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\n    \"prompt\": \"beautiful woman, soft lighting, portrait\",\n    \"negative_prompt\": \"lowres, bad quality\",\n    \"width\": 832,\n    \"height\": 1216,\n    \"steps\": 28,\n    \"cfg_scale\": 6.5,\n    \"seed\": 42,\n    \"checkpoint\": \"bigLove_photo1.3.safetensors\"\n  }'\n```\n\n### Check Health\n```bash\ncurl \"https://your-pod-8000.proxy.runpod.net/health\"\n```\n\n## Environment Variables\n\n### Required for Private Models\n- `CIVITAI_TOKEN`: Your Civitai API token\n- `HF_TOKEN`: Your Hugging Face token\n\n### Model Downloads\n- `CIVITAI_VERSION_IDS_TO_DOWNLOAD`: Version IDs for checkpoints\n- `LORA_VERSION_IDS_TO_DOWNLOAD`: Version IDs for LoRAs\n- `HF_REPOS_TO_DOWNLOAD`: HuggingFace repositories\n\n### Service Control\n- `ENABLE_JUPYTER`: Enable JupyterLab (default: true)\n- `ENABLE_FILEBROWSER`: Enable FileBrowser (default: false)\n- `ENABLE_API`: Enable FastAPI endpoint (default: true)\n\n## Model Management\n\nModels are automatically downloaded to `/workspace/models/` and persist across restarts.\n\n### Supported Model Types\n- **Checkpoints**: `/workspace/models/checkpoints/`\n- **LoRAs**: `/workspace/models/loras/`\n- **VAE**: `/workspace/models/vae/`\n- **ControlNet**: `/workspace/models/controlnet/`\n- **Upscalers**: `/workspace/models/upscale_models/`\n\n## Custom Workflows\n\nPlace workflow JSON files in `/workspace/workflows/` and modify the API to load them.\n\n## Troubleshooting\n\n1. **502 Bad Gateway**: Wait for services to start (check logs)\n2. **Model not found**: Verify environment variables and check downloads\n3. **Generation timeout**: Increase `COMFY_TIMEOUT` value\n4. **Out of memory**: Use smaller image dimensions or reduce batch size\n\n## Logs\n- ComfyUI: `/workspace/comfyui.log`\n- JupyterLab: `/workspace/jupyter.log`\n- FileBrowser: `/tmp/filebrowser.log`"
+}

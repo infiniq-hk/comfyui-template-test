@@ -1,0 +1,12 @@
+requests
+tqdm
+pydantic
+typing-extensions
+huggingface-hub==0.24.6
+hf-transfer
+opencv-python-headless
+jupyterlab
+fastapi
+uvicorn[standard]
+python-multipart
+safetensors
