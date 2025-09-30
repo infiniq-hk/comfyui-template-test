@@ -90,6 +90,31 @@ if [[ -n "${HF_REPOS_TO_DOWNLOAD:-}" || -n "${HF_FILES_TO_DOWNLOAD:-}" ]]; then
   set -e
 fi
 
+# Preload FaceID/IP-Adapter assets (optional)
+if [[ "${INSTALL_FACEID_MODELS:-true}" == "true" ]]; then
+  /opt/scripts/download_hf.sh "${HF_TOKEN:-}" "${FACEID_HF_REPOS:-h94/IP-Adapter-FaceID}" "${FACEID_HF_FILES:-}"
+  python - <<'PY'
+import os, shutil, glob
+root = os.environ.get("MODELS_DIR","/workspace/models")
+os.makedirs(os.path.join(root, "ipadapter"), exist_ok=True)
+os.makedirs(os.path.join(root, "clip_vision"), exist_ok=True)
+
+def copy_glob(src_glob, dst_dir):
+    for p in glob.glob(src_glob, recursive=True):
+        try:
+            shutil.copy2(p, os.path.join(dst_dir, os.path.basename(p)))
+        except Exception:
+            pass
+
+# FaceID Plus V2 (bin + lora)
+copy_glob(os.path.join(root, "h94__IP-Adapter-FaceID", "**", "*faceid*sdxl*.*"), os.path.join(root, "ipadapter"))
+
+# CLIP-ViT vision weights if present in repos
+for pat in ["*CLIP-ViT-*.safetensors","*bigG-14*.safetensors","*ViT-H-14*.safetensors","*.pt","*.bin"]:
+    copy_glob(os.path.join(root, "h94__IP-Adapter*", "**", pat), os.path.join(root, "clip_vision"))
+PY
+fi
+
 # Start optional services
 if [[ "${ENABLE_JUPYTER:-false}" == "true" ]]; then
   echo "Starting JupyterLab on port 8888..."
@@ -110,6 +135,13 @@ fi
 # Start ComfyUI in background
 cd "${COMFYUI_DIR}"
 echo "Starting ComfyUI on port ${COMFYUI_PORT:-8188}..."
+
+# free port if a stale process remains
+pkill -f "python.*main.py" || true
+if ss -ltn "( sport = :${COMFYUI_PORT:-8188} )" | grep -q LISTEN; then
+  pid=$(ss -ltnp | awk -v p=":${COMFYUI_PORT:-8188}" '$4~p && $6=="LISTEN"{print gensub(/.*,pid=([0-9]+).*/,"\\1",1,$7)}' | head -n1)
+  [ -n "$pid" ] && kill -9 "$pid" || true
+fi
 
 # Optionally fetch a default workflow JSON if provided
 if [[ -n "${DEFAULT_WORKFLOW_URL:-}" ]]; then

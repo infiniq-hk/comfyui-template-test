@@ -1,6 +1,6 @@
-# ComfyUI on RunPod with FastAPI serverless endpoint
+# ComfyUI on RunPod with FastAPI serverless endpoint - CUDA 12.8 Compatible
 # Based on Hearmeman24's patterns: single entrypoint, healthchecked, reliable downloads
-FROM pytorch/pytorch:2.4.0-cuda12.1-cudnn9-runtime
+FROM pytorch/pytorch:2.5.1-cuda12.4-cudnn9-runtime
 
 # Use bash with pipefail for safer RUN steps
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
@@ -12,12 +12,21 @@ ENV DEBIAN_FRONTEND=noninteractive \
     COMFYUI_DIR=/opt/ComfyUI \
     MODELS_DIR=/workspace/models \
     HF_HOME=/workspace/.cache/huggingface \
+    HF_HUB_ENABLE_HF_TRANSFER=1 \
+    HF_HUB_DISABLE_TELEMETRY=1 \
     PIP_NO_CACHE_DIR=1 \
     TZ=UTC \
     LISTEN_HOST=0.0.0.0 \
     COMFYUI_PORT=8188 \
     API_PORT=8000 \
-    COMFYUI_EXTRA_ARGS=
+    CUDA_LAUNCH_BLOCKING=1 \
+    TORCH_USE_CUDA_DSA=1 \
+    CUDA_MODULE_LOADING=LAZY \
+    PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True \
+    COMFYUI_EXTRA_ARGS= \
+    INSTALL_FACEID_MODELS=true \
+    FACEID_HF_REPOS="h94/IP-Adapter-FaceID,h94/IP-Adapter" \
+    FACEID_HF_FILES=""
 
 # System deps
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -25,10 +34,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libgl1 libglib2.0-0 build-essential && \
     rm -rf /var/lib/apt/lists/*
 
+# Install latest PyTorch with CUDA 12.4+ support for RTX 5090/H200 compatibility
+RUN pip install --upgrade pip && \
+    pip install torch==2.5.1 torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124 && \
+    pip install --upgrade nvidia-ml-py3
+
 # Python deps
 COPY requirements.txt /opt/requirements.txt
-RUN pip install --upgrade pip && \
-    pip install --no-cache-dir -r /opt/requirements.txt
+RUN pip install --no-cache-dir -r /opt/requirements.txt && \
+    pip install --no-cache-dir -U insightface onnx onnxruntime onnxsim scikit-image piexif
 
 # Install FileBrowser (optional)
 RUN curl -L -o /tmp/fb.tar.gz https://github.com/filebrowser/filebrowser/releases/latest/download/linux-amd64-filebrowser.tar.gz && \
@@ -47,15 +61,21 @@ RUN mkdir -p ${WORKSPACE} ${MODELS_DIR} && \
     rm -rf ${COMFYUI_DIR}/models && \
     ln -s ${MODELS_DIR} ${COMFYUI_DIR}/models
 
-# Pre-install essential custom nodes
+# Pre-install essential custom nodes with latest versions
 RUN set -eux; \
     cd ${COMFYUI_DIR}/custom_nodes && \
     for repo in \
         https://github.com/ltdrdata/ComfyUI-Manager.git \
+        https://github.com/ltdrdata/ComfyUI-Impact-Pack.git \
+        https://github.com/ltdrdata/ComfyUI-Impact-Subpack.git \
+        https://github.com/pythongosssss/ComfyUI-Custom-Scripts.git \
         https://github.com/ssitu/ComfyUI_UltimateSDUpscale.git \
         https://github.com/kijai/ComfyUI-KJNodes.git \
         https://github.com/rgthree/rgthree-comfy.git \
-        https://github.com/cubiq/ComfyUI_IPAdapter_plus.git; \
+        https://github.com/cubiq/ComfyUI_IPAdapter_plus.git \
+        https://github.com/WASasquatch/was-node-suite-comfyui.git \
+        https://github.com/ClownsharkBatwing/RES4LYF.git \
+        https://github.com/yolain/ComfyUI-Easy-Use.git; \
     do \
         repo_dir=$(basename "$repo" .git); \
         if [ ! -d "$repo_dir" ]; then \
