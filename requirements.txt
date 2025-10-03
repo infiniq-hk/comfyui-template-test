@@ -10,3 +10,9 @@ fastapi
 uvicorn[standard]
 python-multipart
 safetensors
+insightface
+onnx
+onnxruntime
+onnxsim
+scikit-image
+piexif

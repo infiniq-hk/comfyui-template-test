@@ -16,4 +16,4 @@ jobs:
         with:
           context: .
           push: true
-          tags: 8int/comfyui-runpod:latest
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/${{ github.event.repository.name }}:latest

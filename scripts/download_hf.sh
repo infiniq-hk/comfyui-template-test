@@ -69,7 +69,3 @@ for f in "${files[@]:-}"; do
 done
 
 echo "Hugging Face downloads done"
-
-
-
-
